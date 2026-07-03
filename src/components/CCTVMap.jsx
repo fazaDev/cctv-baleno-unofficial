@@ -14,10 +14,35 @@ export default function CCTVMap({ cameras, onPlayModal }) {
       attributionControl: true,
     }).setView([-1.88, 103.65], 11);
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: "&copy; OpenStreetMap &copy; CARTO",
-      maxZoom: 19,
-    }).addTo(map);
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+      }
+    ).addTo(map);
+
+    mapInstanceRef.current = map;
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Clear existing markers
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker) {
+        map.removeLayer(layer);
+      }
+    });
+
+    if (cameras.length === 0) return;
 
     const icon = L.divIcon({
       className: "custom-marker",
@@ -43,13 +68,6 @@ export default function CCTVMap({ cameras, onPlayModal }) {
       const group = L.featureGroup(markers);
       map.fitBounds(group.getBounds().pad(0.1));
     }
-
-    mapInstanceRef.current = map;
-
-    return () => {
-      map.remove();
-      mapInstanceRef.current = null;
-    };
   }, [cameras]);
 
   useEffect(() => {
@@ -61,6 +79,18 @@ export default function CCTVMap({ cameras, onPlayModal }) {
       delete window.__openModal;
     };
   }, [cameras, onPlayModal]);
+
+  if (cameras.length === 0) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-bg text-text-dim">
+        <i className="fas fa-map-marked-alt text-5xl mb-4"></i>
+        <p className="text-lg">Tidak ada CCTV yang dipilih</p>
+        <p className="text-sm mt-2 text-text-dim/60">
+          Centang kamera di sidebar untuk menampilkan di peta
+        </p>
+      </div>
+    );
+  }
 
   return <div ref={mapRef} className="w-full h-full" />;
 }

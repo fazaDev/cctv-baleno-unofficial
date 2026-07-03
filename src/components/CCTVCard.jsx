@@ -2,39 +2,75 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 
-export default function CCTVCard({ cam }) {
+export default function CCTVCard({ cam, canPlay }) {
   const videoNodeRef = useRef(null);
   const playerRef = useRef(null);
+  const containerRef = useRef(null);
   const [status, setStatus] = useState(cam.status);
   const [hasError, setHasError] = useState(false);
+  const [isInView, setIsInView] = useState(false);
 
+  // IntersectionObserver: detect visibility
   useEffect(() => {
-    if (!videoNodeRef.current || playerRef.current) return;
+    const node = containerRef.current;
+    if (!node) return;
 
-    const player = videojs(videoNodeRef.current, {
-      controls: true,
-      muted: true,
-      autoplay: true,
-      preload: "auto",
-      fill: true,
-      responsive: true,
-      sources: [{ src: cam.stream, type: "application/x-mpegURL" }],
-    });
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsInView(entry.isIntersecting),
+      { threshold: 0.1 }
+    );
 
-    player.on("error", () => {
-      setStatus("offline");
-      setHasError(true);
-    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
-    playerRef.current = player;
+  // Manage player based on canPlay + isInView
+  useEffect(() => {
+    if (canPlay && isInView && !playerRef.current && videoNodeRef.current && !hasError) {
+      const player = videojs(videoNodeRef.current, {
+        controls: true,
+        muted: true,
+        autoplay: true,
+        preload: "none",
+        fill: true,
+        responsive: true,
+        sources: [{ src: cam.stream, type: "application/x-mpegURL" }],
+      });
 
+      player.on("error", () => {
+        setStatus("offline");
+        setHasError(true);
+      });
+
+      playerRef.current = player;
+    }
+
+    // Pause when not visible or not allowed
+    if (playerRef.current && (!isInView || !canPlay)) {
+      if (!playerRef.current.paused()) {
+        playerRef.current.pause();
+      }
+    }
+
+    // Resume when visible and allowed
+    if (playerRef.current && isInView && canPlay && !hasError) {
+      if (playerRef.current.paused()) {
+        playerRef.current.play().catch(() => {});
+      }
+    }
+
+    return () => {};
+  }, [canPlay, isInView, cam.stream, hasError]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       if (playerRef.current) {
         playerRef.current.dispose();
         playerRef.current = null;
       }
     };
-  }, [cam.stream]);
+  }, []);
 
   const handleRefresh = useCallback(() => {
     setHasError(false);
@@ -56,7 +92,7 @@ export default function CCTVCard({ cam }) {
         controls: true,
         muted: true,
         autoplay: true,
-        preload: "auto",
+        preload: "none",
         fill: true,
         responsive: true,
         sources: [{ src: cam.stream, type: "application/x-mpegURL" }],
@@ -70,9 +106,15 @@ export default function CCTVCard({ cam }) {
   }, [cam.stream, cam.status]);
 
   return (
-    <div className="relative w-full rounded-xl overflow-hidden border border-border transition-all duration-200 hover:-translate-y-0.5 hover:border-primary group">
+    <div
+      ref={containerRef}
+      className="relative w-full rounded-xl overflow-hidden border border-border transition-all duration-200 hover:-translate-y-0.5 hover:border-primary group"
+    >
       {hasError ? (
-        <div className="w-full flex flex-col items-center justify-center bg-placeholder text-text-dim" style={{ aspectRatio: "4/3" }}>
+        <div
+          className="w-full flex flex-col items-center justify-center bg-placeholder text-text-dim"
+          style={{ aspectRatio: "4/3" }}
+        >
           <i className="fas fa-video-slash text-3xl mb-2"></i>
           <span className="text-sm">Stream tidak tersedia</span>
           <button
@@ -89,7 +131,7 @@ export default function CCTVCard({ cam }) {
             className="video-js vjs-big-play-centered vjs-fill"
           />
 
-          {/* Top overlay: Lokasi + Status */}
+          {/* Top overlay */}
           <div className="absolute top-0 left-0 right-0 z-10 p-2 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-1.5">
@@ -108,7 +150,7 @@ export default function CCTVCard({ cam }) {
             </div>
           </div>
 
-          {/* Bottom overlay: Status badge */}
+          {/* Bottom overlay */}
           <div className="absolute bottom-0 left-0 right-0 z-10 p-2 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
             <div className="flex justify-between items-end">
               <span
@@ -125,6 +167,13 @@ export default function CCTVCard({ cam }) {
               </span>
             </div>
           </div>
+
+          {/* Paused indicator when not in view or can't play */}
+          {(!isInView || !canPlay) && !hasError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-5">
+              <i className="fas fa-pause-circle text-white/50 text-3xl"></i>
+            </div>
+          )}
         </div>
       )}
     </div>

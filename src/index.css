@@ -30,6 +30,23 @@ body {
   min-height: 100vh;
 }
 
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dim);
+}
+
 .leaflet-popup-content-wrapper {
   background: var(--color-surface);
   color: var(--color-text);
@@ -66,9 +83,4 @@ body {
 .vjs-tech video,
 .vjs-poster img {
   object-fit: cover !important;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
